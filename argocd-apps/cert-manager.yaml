@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/DurojaiyeAbisoye/kubeflow-argocd.git
+    targetRevision: main
+    path: common/cert-manager/overlays/kubeflow
+  ignoreDifferences:
+  - group: apiextensions.k8s.io
+    kind: CustomResourceDefinition
+    jsonPointers:
+      - /spec/preserveUnknownFields
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
