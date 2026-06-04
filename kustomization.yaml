@@ -11,6 +11,7 @@ resources:
   - argocd-apps/kubeflow-ns.yaml
   - argocd-apps/kubeflow-roles.yaml
   - argocd-apps/user-namespace.yaml
+  - argocd-apps/metacontroller.yaml
   # applications — ML platform layer
   - argocd-apps/admission-webhook.yaml
   - argocd-apps/central-dashboard.yaml
@@ -18,7 +19,6 @@ resources:
   - argocd-apps/notebook-controller.yaml share with jupyter?
   - argocd-apps/katib.yaml
   - argocd-apps/kserve.yaml
-  - argocd-apps/model-registry.yaml
   - argocd-apps/pipeline.yaml
   - argocd-apps/profiles.yaml
   - argocd-apps/pvcviewer-controller.yaml
@@ -27,6 +27,5 @@ resources:
   - argocd-apps/trainer.yaml
   - argocd-apps/training-operator.yaml
   - argocd-apps/volumes-web-app.yaml
-  # monitoring
-  - argocd-apps/prometheus.yaml
-  - argocd-apps/grafana.yaml
+  - argocd-apps/tensorboards-web-app.yaml   
+  - argocd-apps/models-web-app.yaml
