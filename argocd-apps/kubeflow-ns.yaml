@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/DurojaiyeAbisoye/kubeflow-argocd.git
     targetRevision: main
-    path: common/kubeflow-namespace/base/kubeflow
+    path: common/kubeflow-namespace/base
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:

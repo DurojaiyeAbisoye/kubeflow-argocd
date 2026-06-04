@@ -94,3 +94,7 @@ patches:
           "disableIngressCreation": false,
           "pathTemplate": "/serving/{{ .Namespace }}/{{ .Name }}"
         }
+      deployDefaults: |-
+        {
+          "deployRaw": true
+        }
