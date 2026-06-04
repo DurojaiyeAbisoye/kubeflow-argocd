@@ -406,8 +406,7 @@ To extend or customize this platform:
 
 ## License
 
-These manifests are based on the Kubeflow 1.7 release and provided as examples for the O'Reilly "Machine Learning Platform Engineering" book.
-
+These manifests are based on the Kubeflow 2026 03 release and provided based on a similar repo in the O'Reilly "Machine Learning Platform Engineering" book.
 ---
 
 ## References
