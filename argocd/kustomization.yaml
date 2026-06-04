@@ -6,8 +6,12 @@ resources:
   - namespace.yaml
   - https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-patchesStrategicMerge:
-  - configmap-patch.yaml
+patches:
+  - path: configmap-patch.yaml
+    target:
+      kind: ConfigMap
+      name: argocd-cm
+      namespace: argocd
 
 images:
   - name: quay.io/argoproj/argocd
