@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../insecure
+
+patches:
+  # Configure Istio CNI plugin for k3s containerd socket path
+  - target:
+      kind: IstioOperator
+      name: installed-state
+    patch: |-
+      - op: add
+        path: /spec/components/cni/k8s/overlays/0
+        value:
+          apiVersion: apps/v1
+          kind: DaemonSet
+          name: istio-cni-node
+          patches:
+            - path: spec.template.spec.containers/0/env/-
+              value:
+                name: CONTAINER_RUNTIME_ENDPOINT
+                value: unix:///run/k3s/containerd/containerd.sock
