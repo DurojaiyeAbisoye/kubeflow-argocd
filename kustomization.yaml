@@ -16,7 +16,7 @@ resources:
   - argocd-apps/admission-webhook.yaml
   - argocd-apps/central-dashboard.yaml
   - argocd-apps/jupyter.yaml
-  - argocd-apps/notebook-controller.yaml share with jupyter?
+  - argocd-apps/notebook-controller.yaml #share with jupyter?
   - argocd-apps/katib.yaml
   - argocd-apps/kserve.yaml
   - argocd-apps/pipeline.yaml
