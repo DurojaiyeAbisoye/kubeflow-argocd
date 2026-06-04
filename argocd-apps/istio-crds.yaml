@@ -1,21 +1,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: istio
+  name: istio-crds
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   project: default
   source:
     repoURL: https://github.com/DurojaiyeAbisoye/kubeflow-argocd.git
     targetRevision: main
-    path: common/istio/istio-install/base
-  ignoreDifferences:
-  - group: apiextensions.k8s.io
-    kind: CustomResourceDefinition
-    jsonPointers:
-      - /spec/preserveUnknownFields
+    path: common/istio/istio-crds/base
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:

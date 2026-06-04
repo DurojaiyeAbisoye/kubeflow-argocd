@@ -5,6 +5,7 @@ resources:
   # common — infrastructure layer
   - argocd-apps/istio.yaml
   - argocd-apps/cert-manager.yaml
+  - argocd-apps/istio-crds.yaml
   - argocd-apps/knative.yaml
   - argocd-apps/dex.yaml
   - argocd-apps/oauth2-proxy.yaml
