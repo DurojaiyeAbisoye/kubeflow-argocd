@@ -18,14 +18,14 @@ spec:
       - /spec/preserveUnknownFields
   destination:
     server: https://kubernetes.default.svc
+  ignoreDifferences:
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRole
+    jsonPointers:
+      - /rules
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - ServerSideApply=true
-ignoreDifferences:
-  - group: rbac.authorization.k8s.io
-    kind: ClusterRole
-    jsonPointers:
-      - /rules
