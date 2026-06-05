@@ -17,7 +17,7 @@ spec:
     automated:
       prune: true
       selfHeal: true  
-  ignoreDifferences:
+ignoreDifferences:
   - group: rbac.authorization.k8s.io
     kind: ClusterRole
     jsonPointers:
