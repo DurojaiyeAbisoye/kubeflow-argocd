@@ -18,13 +18,11 @@ resources:
   - argocd-apps/admission-webhook.yaml
   - argocd-apps/central-dashboard.yaml
   - argocd-apps/jupyter.yaml
-  - argocd-apps/notebook-controller.yaml #share with jupyter?
-  - argocd-apps/katib.yaml
+  - argocd-apps/notebook-controller.yaml
   - argocd-apps/kserve.yaml
   - argocd-apps/pipeline.yaml
   - argocd-apps/profiles.yaml
   - argocd-apps/pvcviewer-controller.yaml
-  - argocd-apps/spark-operator.yaml
   - argocd-apps/tensorboard.yaml
   - argocd-apps/trainer.yaml
   - argocd-apps/training-operator.yaml
