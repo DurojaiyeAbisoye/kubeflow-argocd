@@ -13,12 +13,12 @@ spec:
     path: common/kubeflow-roles/base
   destination:
     server: https://kubernetes.default.svc
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true  
-ignoreDifferences:
+  ignoreDifferences:
   - group: rbac.authorization.k8s.io
     kind: ClusterRole
     jsonPointers:
       - /rules
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
