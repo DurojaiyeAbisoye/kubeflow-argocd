@@ -16,6 +16,11 @@ spec:
     kind: CustomResourceDefinition
     jsonPointers:
       - /spec/preserveUnknownFields
+  - group: admissionregistration.k8s.io
+    kind: ValidatingWebhookConfiguration
+    name: istio-validator-istio-system
+    jsonPointers:
+      - /webhooks
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:
