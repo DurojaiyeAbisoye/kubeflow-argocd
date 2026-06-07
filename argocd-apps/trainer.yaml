@@ -16,6 +16,11 @@ spec:
     kind: CustomResourceDefinition
     jsonPointers:
       - /spec/preserveUnknownFields
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: kubeflow-trainer-admin
+    jsonPointers:
+      - /rules
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:
