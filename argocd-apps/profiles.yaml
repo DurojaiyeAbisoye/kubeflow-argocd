@@ -11,6 +11,11 @@ spec:
     repoURL: https://github.com/DurojaiyeAbisoye/kubeflow-argocd.git
     targetRevision: main
     path: applications/profiles/upstream/overlays/kubeflow
+  ignoreDifferences:
+  - group: apiextensions.k8s.io
+    kind: CustomResourceDefinition
+    jsonPointers:
+      - /spec/preserveUnknownFields
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:
