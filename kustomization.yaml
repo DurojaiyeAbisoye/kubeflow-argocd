@@ -11,6 +11,7 @@ resources:
   - argocd-apps/oauth2-proxy.yaml
   - argocd-apps/kubeflow-ns.yaml
   - argocd-apps/kubeflow-roles.yaml
+  - argocd-apps/kubeflow-istio-resources.yaml
   - argocd-apps/user-namespace.yaml
   - argocd-apps/metacontroller.yaml
   - argocd-apps/istio-namespace.yaml
