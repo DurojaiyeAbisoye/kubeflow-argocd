@@ -11,6 +11,17 @@ spec:
     repoURL: https://github.com/DurojaiyeAbisoye/kubeflow-argocd.git
     targetRevision: main
     path: common/knative/knative-serving/base
+  ignoreDifferences:
+  - group: admissionregistration.k8s.io
+    kind: MutatingWebhookConfiguration
+    name: webhook.serving.knative.dev
+    jsonPointers:
+      - /webhooks
+  - group: admissionregistration.k8s.io
+    kind: ValidatingWebhookConfiguration
+    name: validation.webhook.serving.knative.dev
+    jsonPointers:
+      - /webhooks
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:
