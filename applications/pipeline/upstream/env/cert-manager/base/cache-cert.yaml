@@ -7,8 +7,8 @@ spec:
   isCA: true
   dnsNames:
   - cache-server
-  - cache-server.$(kfp-namespace)
-  - cache-server.$(kfp-namespace).svc
+  - cache-server.kubeflow
+  - cache-server.kubeflow.svc
   issuerRef:
     kind: Issuer
     name: kfp-cache-selfsigned-issuer

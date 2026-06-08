@@ -6,9 +6,7 @@ resources:
 - ../../third-party/argo/installs/namespace
 - ../../third-party/seaweedfs/base
 - ../../third-party/postgresql/base
-- ../../env/cert-manager/base/cache-cert-issuer.yaml
-- ../../env/cert-manager/base/cache-cert.yaml
-- ../../env/cert-manager/base/cache-webhook-config.yaml
+- ../../env/cert-manager/base
 namespace: kubeflow
 labels:
 - includeSelectors: true

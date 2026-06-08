@@ -1,4 +1,3 @@
-# argocd/configmap-patch.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,7 +6,7 @@ metadata:
 data:
   kustomize.buildOptions: "--enable-helm"
   kustomize.path.v5.8.1: /usr/local/bin/kustomize
-  server.repo.server.timeout.seconds: "30000" 
+  server.repo.server.timeout.seconds: "300"
   resource.compareoptions: |
     ignoreAggregatedRoles: true
   resource.customizations: |
@@ -20,4 +19,4 @@ data:
       ignoreDifferences: |
         jsonPointers:
         - /webhooks/0/clientConfig/caBundle
-        - /webhooks/1/clientConfig/caBundleapiVersion
+        - /webhooks/1/clientConfig/caBundle

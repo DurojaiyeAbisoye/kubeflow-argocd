@@ -3,13 +3,13 @@ kind: MutatingWebhookConfiguration
 metadata:
   name: cache-webhook-kubeflow
   annotations:
-    cert-manager.io/inject-ca-from: $(kfp-namespace)/kfp-cache-cert
+    cert-manager.io/inject-ca-from: kubeflow/kfp-cache-cert
 webhooks:
-  - name: cache-server.$(kfp-namespace).svc
+  - name: cache-server.kubeflow.svc
     clientConfig:
       service:
         name: cache-server
-        namespace: $(kfp-namespace)
+        namespace: kubeflow
         path: "/mutate"
     failurePolicy: Ignore
     rules:
@@ -22,4 +22,3 @@ webhooks:
     objectSelector:
       matchLabels:
         pipelines.kubeflow.org/cache_enabled: "true"
-    admissionReviewVersions: ["v1beta1"]
