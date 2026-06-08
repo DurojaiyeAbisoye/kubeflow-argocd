@@ -13,6 +13,12 @@ spec:
     path: applications/pipeline/upstream/env/platform-agnostic-multi-user
   destination:
     server: https://kubernetes.default.svc
+  ignoreDifferences:
+  - group: apps
+    kind: StatefulSet
+    name: metacontroller
+    jsonPointers:
+      - /metadata/labels/application-crd-id
   syncPolicy:
     automated:
       prune: true
