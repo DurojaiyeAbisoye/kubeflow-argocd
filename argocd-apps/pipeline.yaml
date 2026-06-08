@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/DurojaiyeAbisoye/kubeflow-argocd.git
     targetRevision: main
-    path: applications/pipeline/upstream/env/platform-agnostic-postgresql
+    path: applications/pipeline/upstream/env/platform-agnostic-multi-user
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:
