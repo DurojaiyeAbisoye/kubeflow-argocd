@@ -19,7 +19,10 @@ spec:
     name: metacontroller
     jsonPointers:
       - /metadata/labels/application-crd-id
+      - /spec/serviceName
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
