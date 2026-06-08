@@ -20,6 +20,17 @@ spec:
     jsonPointers:
       - /metadata/labels/application-crd-id
       - /spec/serviceName
+      - /metadata/annotations/argocd.argoproj.io~1tracking-id
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: kubeflow-pipelines-edit
+    jsonPointers:
+      - /rules
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: kubeflow-pipelines-view
+    jsonPointers:
+      - /rules
   syncPolicy:
     automated:
       prune: true
