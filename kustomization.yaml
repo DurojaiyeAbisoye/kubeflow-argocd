@@ -13,7 +13,6 @@ resources:
   - argocd-apps/kubeflow-roles.yaml
   - argocd-apps/kubeflow-istio-resources.yaml
   - argocd-apps/user-namespace.yaml
-  - argocd-apps/metacontroller.yaml
   - argocd-apps/istio-namespace.yaml
   # applications — ML platform layer
   - argocd-apps/admission-webhook.yaml
