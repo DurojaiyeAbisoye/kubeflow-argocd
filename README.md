@@ -76,7 +76,7 @@ kubeflow-argo-manifests/
 ├── argocd/                            # ArgoCD control plane
 │   ├── kustomization.yaml
 │   ├── namespace.yaml
-│   └── configmap-patch.yaml          # Kustomize v5.8.1 path configuration
+│   └── configmap-patch.yaml          # Kustomize v5.8.1 path + repo-server timeout config
 │
 ├── argocd-apps/                       # 25 ArgoCD Application manifests
 │   ├── cert-manager.yaml              # Wave 1: Certificate generation
@@ -216,17 +216,38 @@ env:
     value: unix:///run/k3s/containerd/containerd.sock
 ```
 
+### ArgoCD Repo-Server Timeout
+
+The pipeline app pulls Argo Workflows manifests remotely from GitHub. The default
+27s timeout is too short. `argocd/configmap-patch.yaml` sets:
+
+```yaml
+server.repo.server.timeout.seconds: "300"
+```
+
+This is required on fresh installs — without it the pipeline app will fail to sync.
+
 ---
 
 ## Known Pitfalls & Fixes
 
 See [BOOTSTRAP_RUNBOOK.md](BOOTSTRAP_RUNBOOK.md#known-issues--fixes) for complete troubleshooting guide.
 
-**Most critical:**
+**Kubeflow bootstrap:**
 - ❌ **Traefik + Istio conflict** → Use `--disable traefik` at install time
 - ❌ **ArgoCD repo not registered** → Run `argocd repo add` before applying kubeflow.yaml
 - ❌ **cert-manager webhook timeout** → Wave timing handles this; if issues, manually retry wave 2
-- ❌ **kubeconfig owned by root** → Fix permissions in Phase 1 (Phase 2 in bootstrap runbook)
+- ❌ **kubeconfig owned by root** → Fix permissions in Phase 1
+
+**KFP pipeline app:**
+- ❌ **Kustomize build fails with 27s timeout** → Fixed via `server.repo.server.timeout.seconds: 300` in `argocd/configmap-patch.yaml`
+- ❌ **`webhook-server-tls` secret missing** → Fixed by referencing cert-manager directory (not individual files) in `platform-agnostic-postgresql/kustomization.yaml` and removing deprecated `vars`
+- ❌ **`cache-server` CrashLoopBackOff: `Driver pgx is not supported`** → Fixed by changing `DBCONFIG_DRIVER` from `pgx` to `postgres` in cache deployment manifest
+
+**Post-install MLOps stack:**
+- ❌ **Yatai: `dial tcp [::1]:5432 connection refused`** → Book's helm install is outdated; current chart has no bundled postgres. Use explicit `--set postgresql.*` flags pointing at your postgres instance
+- ❌ **Yatai: `database "yatai" does not exist`** → Must manually `CREATE DATABASE yatai` in postgres before installing
+- ❌ **Evidently UI: 500 on `/api/projects`** → Two causes: missing `--workspace` flag in deployment command, and `inotify instance limit reached` on single-node k3s (fix with `sysctl fs.inotify.max_user_instances=512`)
 
 ---
 
@@ -271,30 +292,11 @@ kubectl -n argocd port-forward svc/argocd-server 8080:443 &
 
 ### Change Repository URL
 
-Update all 24 argocd-apps/*.yaml files:
+Update all argocd-apps/*.yaml files:
 
 ```bash
-# Option 1: Global search-replace
-grep -r "https://github.com/DurojaiyeAbisoye/kubeflow-argocd.git" argocd-apps/ \
-  | sed 's/:.*//g' | xargs -I {} sed -i 's|YOUR_URL|https://github.com/your-org/your-repo.git|g' {}
-
-# Option 2: Manual edit key files
-# argocd-apps/{cert-manager,istio,kubeflow-ns,etc.}.yaml
-# Change: repoURL: https://github.com/YOUR_REPO/kubeflow-argocd.git
-```
-
-### Adjust Resource Limits
-
-Edit individual application manifests in `applications/*/`:
-
-```yaml
-resources:
-  requests:
-    memory: "512Mi"
-    cpu: "250m"
-  limits:
-    memory: "1Gi"
-    cpu: "500m"
+grep -rl "https://github.com/DurojaiyeAbisoye/kubeflow-argocd.git" argocd-apps/ \
+  | xargs sed -i 's|https://github.com/DurojaiyeAbisoye/kubeflow-argocd.git|https://github.com/your-org/your-repo.git|g'
 ```
 
 ### Extend with Custom Applications
@@ -308,7 +310,7 @@ metadata:
   name: my-custom-app
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "6"  # After core apps
+    argocd.argoproj.io/sync-wave: "6"
 spec:
   project: default
   source:
@@ -337,14 +339,11 @@ kustomize build argocd/ | kubectl delete -f -
 # Uninstall k3s
 /usr/local/bin/k3s-uninstall.sh
 
-# Clean system state (including CNI, cgroup configuration)
+# Clean system state
 sudo rm -rf /etc/rancher /var/lib/rancher /run/k3s /run/flannel
 sudo rm -rf /etc/cni /var/lib/cni /opt/cni
 sudo ip link delete cni0 2>/dev/null || true
 sudo ip link delete flannel.1 2>/dev/null || true
-
-# Verify cleanup
-ls -la /etc/rancher 2>&1  # Should be "No such file or directory"
 ```
 
 ---
@@ -353,18 +352,16 @@ ls -la /etc/rancher 2>&1  # Should be "No such file or directory"
 
 - **Kubeflow**: 1.7+ manifests (26.03 release)
 - **k3s**: Latest stable with traefik disabled
-- **ArgoCD**: v3.3.9+ (with Kustomize 5.8.1 init container)
+- **ArgoCD**: v3.3.9
 - **Istio**: Latest (service mesh)
-- **Kubernetes**: 1.28+ (via k3s)
-- **Kustomize**: v5.8.1+ (required for manifest patching)
-- **kubectl**: v1.36.0+ (tested)
-- **yq**: v4.53.2+ (YAML processing)
+- **Kubernetes**: v1.35.5 (via k3s)
+- **Kustomize**: v5.8.1
 
 **Post-install (optional):**
-- **MLflow**: 3.12.0
-- **Redis**: Latest (Helm bitnami/redis chart)
-- **BentoML/Yatai**: Latest (Helm bentoml/yatai chart)
-- **Evidently**: 0.4.30
+- **MLflow**: custom image `abisoye314/mlflow:v1`
+- **Redis**: bitnami/redis (Helm)
+- **BentoML/Yatai**: bentoml/yatai v1.1.13 (Helm)
+- **Evidently**: 0.7.20
 
 ---
 
@@ -378,35 +375,20 @@ ls -la /etc/rancher 2>&1  # Should be "No such file or directory"
 
 ## Support & Troubleshooting
 
-### Common Issues
-
 1. **kubectl: connection refused** → k3s not running or not installed
 2. **ArgoCD applications stuck in Syncing** → Check repo is registered (`argocd repo list`)
 3. **Pods pending/CrashLoopBackOff** → Check namespace PSS labels, events (`kubectl describe pod`)
 4. **Istio sidecar not injected** → Verify `istio-injection: enabled` label on namespace
 5. **MLflow can't write artifacts** → Check SeaweedFS bucket exists and S3 credentials
 
-See full troubleshooting in [BOOTSTRAP_RUNBOOK.md](BOOTSTRAP_RUNBOOK.md#troubleshooting-checklist).
-
----
-
-## Contributing
-
-To extend or customize this platform:
-
-1. Fork or clone this repository
-2. Create feature branch: `git checkout -b feature/my-feature`
-3. Update manifests in `applications/` or `common/`
-4. Add new ArgoCD Application in `argocd-apps/`
-5. Test: `kustomize build <path>` (all manifests must validate)
-6. Commit with clear message referencing the change
-7. Push and create PR
+See full troubleshooting in [BOOTSTRAP_RUNBOOK.md](BOOTSTRAP_RUNBOOK.md#troubleshooting-checklist) and [POST_INSTALL_RUNBOOK.md](POST_INSTALL_RUNBOOK.md#troubleshooting).
 
 ---
 
 ## License
 
 These manifests are based on the Kubeflow 2026 03 release and provided based on a similar repo in the O'Reilly "Machine Learning Platform Engineering" book.
+
 ---
 
 ## References
@@ -429,10 +411,10 @@ These manifests are based on the Kubeflow 2026 03 release and provided based on 
 | KFP Pipelines UI | http://localhost:3000 | `kubectl port-forward -n kubeflow svc/ml-pipeline 3000:8888` |
 | ArgoCD | https://localhost:8080 | `kubectl port-forward -n argocd svc/argocd-server 8080:443` |
 | MLflow (post-install) | http://localhost:5000 | `kubectl port-forward -n mlflow svc/mlflow-service 5000:5000` |
-| Yatai (post-install) | http://localhost:8080 | `kubectl port-forward -n yatai-system svc/yatai 8080:80` |
+| Yatai (post-install) | http://localhost:8081 | `kubectl port-forward -n yatai-system svc/yatai-test 8081:80` |
 | Evidently (post-install) | http://localhost:8000 | `kubectl port-forward -n evidently svc/evidently-ui 8000:8000` |
 
 Default credentials:
 - **Kubeflow UI**: user@kubeflow.org / 12341234
 - **ArgoCD**: admin / (see bootstrap Phase 4)
-- **Yatai**: (created during Phase 4 of post-install)
+- **Yatai**: created during post-install Phase 4 setup
