@@ -258,8 +258,8 @@ See [BOOTSTRAP_RUNBOOK.md](BOOTSTRAP_RUNBOOK.md#known-issues--fixes) for complet
 After Kubeflow bootstrap (Phase 8 complete):
 
 ```bash
-# 1. Port-forward KFP
-kubectl port-forward -n kubeflow svc/ml-pipeline 3000:8888 &
+# 1. Port-forward Kubeflow
+kubectl port-forward -n istio-system svc/istio-ingressgateway 8080:80 &
 
 # 2. Run smoke test pipeline
 cd scripts/
