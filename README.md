@@ -403,16 +403,44 @@ These manifests are based on the Kubeflow 2026 03 release and provided based on 
 
 ## Quick Links
 
-**After bootstrap completes, access:**
+**Single port-forward for all Kubeflow UIs (routes via Istio ingress gateway):**
 
-| Component | URL | Command |
-|-----------|-----|---------|
-| Kubeflow Dashboard | http://localhost:8888 | `kubectl port-forward -n kubeflow svc/centraldashboard 8888:80` |
-| KFP Pipelines UI | http://localhost:3000 | `kubectl port-forward -n kubeflow svc/ml-pipeline 3000:8888` |
-| ArgoCD | https://localhost:8080 | `kubectl port-forward -n argocd svc/argocd-server 8080:443` |
-| MLflow (post-install) | http://localhost:5000 | `kubectl port-forward -n mlflow svc/mlflow-service 5000:5000` |
-| Yatai (post-install) | http://localhost:8081 | `kubectl port-forward -n yatai-system svc/yatai-test 8081:80` |
-| Evidently (post-install) | http://localhost:8000 | `kubectl port-forward -n evidently svc/evidently-ui 8000:8000` |
+```bash
+kubectl port-forward -n istio-system svc/istio-ingressgateway 8080:80
+```
+
+Then access everything at `http://localhost:8080`:
+- Kubeflow Dashboard
+- KFP Pipelines UI
+- Jupyter
+- Katib
+- TensorBoard
+- KServe Models
+- Volumes
+
+**Other components:**
+
+```bash
+# ArgoCD
+kubectl port-forward -n argocd svc/argocd-server 8443:443
+
+# MLflow (post-install)
+kubectl port-forward -n mlflow svc/mlflow-service 5000:5000
+
+# Yatai (post-install)
+kubectl port-forward -n yatai-system svc/yatai-test 8081:80
+
+# Evidently (post-install)
+kubectl port-forward -n evidently svc/evidently-ui 8000:8000
+```
+
+| Component | URL |
+|-----------|-----|
+| All Kubeflow UIs | http://localhost:8080 |
+| ArgoCD | https://localhost:8443 |
+| MLflow | http://localhost:5000 |
+| Yatai | http://localhost:8081 |
+| Evidently | http://localhost:8000 |
 
 Default credentials:
 - **Kubeflow UI**: user@kubeflow.org / 12341234
