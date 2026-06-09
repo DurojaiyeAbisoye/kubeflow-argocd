@@ -36,7 +36,7 @@ def say_hello(name: str) -> str:
 @dsl.pipeline(name="hello-world", description="Smoke test for kubeflow-argocd platform")
 def hello_pipeline(name: str = "kubeflow-argocd"):
     """Minimal pipeline to verify KFP v2 stack."""
-    hello_task = say_hello(name=name)
+    say_hello(name=name)
 
 
 if __name__ == "__main__":
@@ -46,14 +46,14 @@ if __name__ == "__main__":
 
     # Connect to KFP API and create run
     try:
-        client = kfp.Client(host="http://localhost:3000")
+        client = kfp.Client(host="http://localhost:8084")
         run = client.create_run_from_pipeline_func(
             hello_pipeline,
             arguments={"name": "kubeflow-argocd"},
             run_name="smoke-test",
         )
         print(f"✓ Run created: {run.run_id}")
-        print("✓ Check the KFP UI at http://localhost:3000 for results")
+        print("✓ Check the KFP UI at http://localhost:8084 for results")
         print(f"✓ Artifacts stored in SeaweedFS mlpipeline bucket")
     except Exception as e:
         print(f"✗ Error: {e}")
