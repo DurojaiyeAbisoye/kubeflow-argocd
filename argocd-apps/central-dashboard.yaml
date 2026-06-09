@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/DurojaiyeAbisoye/kubeflow-argocd.git
     targetRevision: main
-    path: applications/centraldashboard/upstream/overlays/istio
+    path: applications/centraldashboard/upstream/overlays/kserve
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:
