@@ -19,7 +19,7 @@ spec:
           type: RuntimeDefault
       containers:
       - image: kserve/models-web-app:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: kserve-models-web-app
         env:
           - name: GUNICORN_CMD_ARGS

@@ -22,7 +22,7 @@ spec:
       containers:
       - name: model-registry-ui
         image: model-registry-ui
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
             path: /healthcheck

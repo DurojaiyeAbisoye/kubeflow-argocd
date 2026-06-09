@@ -125,7 +125,7 @@ spec:
       containers:
         - name: mlflow
           image: abisoye314/mlflow:v1
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           env:
             - name: AWS_ACCESS_KEY_ID
               value: minio

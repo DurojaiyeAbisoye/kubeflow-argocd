@@ -21,7 +21,7 @@ spec:
           type: RuntimeDefault
       containers:
       - image: ghcr.io/kubeflow/kfp-viewer-crd-controller:dummy
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: ml-pipeline-viewer-crd
         env:
         - name: MAX_NUM_VIEWERS
