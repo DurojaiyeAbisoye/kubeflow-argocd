@@ -1,8 +1,10 @@
 # Post-Install MLOps Stack Runbook
 
-**Version:** 26.03 | **Kubeflow + MLflow + Redis + Yatai + Evidently** | **Date:** 2026-06-04
+**Kubeflow + MLflow + Redis + Yatai + Evidently**
+**Last updated:** 2026-06-09
 
-After completing the Kubeflow bootstrap (see [BOOTSTRAP_RUNBOOK.md](BOOTSTRAP_RUNBOOK.md)), use this runbook to add:
+After completing the Kubeflow bootstrap, use this runbook to add:
+- **PostgreSQL** (shared backend store)
 - **MLflow** (experiment tracking + model registry)
 - **Redis** (online feature store for Feast)
 - **BentoML/Yatai** (model serving on K8s)
@@ -10,52 +12,62 @@ After completing the Kubeflow bootstrap (see [BOOTSTRAP_RUNBOOK.md](BOOTSTRAP_RU
 
 ---
 
-## Prerequisites
+## Known Issues vs. Book
 
-✓ Kubeflow bootstrap complete (all pods Running)  
-✓ SeaweedFS S3 gateway running in kubeflow namespace  
-✓ Postgres will be deployed in this runbook  
-✓ Helm 4+ installed (`helm version`)
+The book (Machine Learning Platform Engineering) was written against older versions of several tools. The following have changed:
+
+| Tool | Book assumes | Reality |
+|------|-------------|---------|
+| `bentoml/yatai` Helm chart | Bundles postgres + redis internally | Chart expects external services; no bundled deps |
+| Yatai secret name | `yatai-env` | `<release-name>-env` (e.g. `yatai-test-env`) |
+| Yatai service name | `yatai` | `<release-name>` (e.g. `yatai-test`) |
+| Evidently UI | Works out of the box | Requires `--workspace` flag and inotify kernel tuning |
 
 ---
 
-## Phase 1: PostgreSQL Backend Store
+## Prerequisites
 
-MLflow and other components need Postgres for metadata storage. Deploy via Helm.
+- Kubeflow bootstrap complete (all pods Running)
+- SeaweedFS running in `kubeflow` namespace (S3 endpoint: `seaweedfs.kubeflow.svc.cluster.local:8333`, credentials: `minio` / `minio123`)
+- Helm installed
 
-### 1a: Add Helm Repository
+---
+
+## Phase 0: Kernel Tuning (Single Node Only)
+
+K3s on a single node exhausts inotify limits quickly. Apply before deploying anything:
+
+```bash
+sudo sysctl fs.inotify.max_user_instances=512
+sudo sysctl fs.inotify.max_user_watches=524288
+
+# Make permanent
+echo "fs.inotify.max_user_instances=512" | sudo tee -a /etc/sysctl.conf
+echo "fs.inotify.max_user_watches=524288" | sudo tee -a /etc/sysctl.conf
+```
+
+---
+
+## Phase 1: PostgreSQL
+
+### Install
 
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo update bitnami
-```
 
-### 1b: Create postgres namespace
-
-```bash
 kubectl create namespace postgres
-```
 
-### 1c: Install PostgreSQL
-
-```bash
 helm install postgres-release bitnami/postgresql \
-  --namespace postgres \
-  --set auth.password=kubeflow2026 \
-  --wait
+  --namespace postgres
 
-# Verify deployment
-kubectl get deployment -n postgres
-kubectl get pods -n postgres  # Should show postgres-release-postgresql-0 Running
+kubectl get pods -n postgres -w
+# Wait for: postgres-release-postgresql-0   Running
 ```
 
-### 1d: Store Postgres Password
+### Get Password
 
 ```bash
-# Capture the password for later use
-export POSTGRES_PASSWORD="kubeflow2026"
-
-# Or retrieve from secret if using Helm's auto-generated password:
 export POSTGRES_PASSWORD=$(
   kubectl get secret \
     --namespace postgres \
@@ -63,67 +75,34 @@ export POSTGRES_PASSWORD=$(
     -o jsonpath="{.data.postgres-password}" \
   | base64 -d
 )
-
-echo "Postgres Password: $POSTGRES_PASSWORD"
+echo "Postgres password: $POSTGRES_PASSWORD"
 ```
 
-**Postgres connection details:**
+**Connection string:**
 ```
-Host: postgres-release-postgresql.postgres.svc.cluster.local
-Port: 5432
-User: postgres
-Password: $POSTGRES_PASSWORD
+postgresql+psycopg2://postgres:<password>@postgres-release-postgresql.postgres.svc.cluster.local:5432/postgres
 ```
 
 ---
 
-## Phase 2: MLflow Deployment
+## Phase 2: MLflow
 
-MLflow serves as the experiment tracker and model registry. It uses Postgres for backend and SeaweedFS S3 gateway for artifact storage.
+### Create mlflow-artifacts bucket in SeaweedFS
 
-### 2a: Create mlflow namespace and secret
-
-```bash
-kubectl create namespace mlflow
-
-# Store SeaweedFS S3 credentials as secret
-kubectl create secret generic mlflow-s3-credentials \
-  --from-literal=aws-access-key-id=minio \
-  --from-literal=aws-secret-access-key=minio123 \
-  -n mlflow
-```
-
-### 2b: Create mlflow-artifacts bucket in SeaweedFS
-
-Port-forward to SeaweedFS S3 gateway and create the bucket:
+SeaweedFS does not auto-create buckets. Use the weed shell:
 
 ```bash
-# Port-forward SeaweedFS S3
-kubectl port-forward -n kubeflow svc/seaweedfs-s3 9000:8333 &
-S3_PID=$!
-sleep 2
+echo "s3.bucket.create -name mlflow-artifacts" | \
+  kubectl exec -i -n kubeflow deployment/seaweedfs -c seaweedfs -- \
+  /usr/bin/weed shell -master=localhost:9333
 
-# Create mlflow-artifacts bucket (using AWS CLI)
-# If AWS CLI not installed: pip install awscli-local or use s3cmd
-aws s3api create-bucket \
-  --bucket mlflow-artifacts \
-  --endpoint-url http://localhost:9000 \
-  --access-key-id minio \
-  --secret-access-key minio123 \
-  --region us-east-1
-
-# Verify bucket exists
-aws s3 ls --endpoint-url http://localhost:9000 \
-  --access-key-id minio \
-  --secret-access-key minio123
-
-# Cleanup port-forward
-kill $S3_PID 2>/dev/null
+# Verify
+echo "s3.bucket.list" | \
+  kubectl exec -i -n kubeflow deployment/seaweedfs -c seaweedfs -- \
+  /usr/bin/weed shell -master=localhost:9333
 ```
 
-### 2c: Create MLflow Deployment
-
-Save the following as `mlflow-deployment.yaml`:
+### deployment.yaml
 
 ```yaml
 apiVersion: apps/v1
@@ -145,52 +124,28 @@ spec:
     spec:
       containers:
         - name: mlflow
-          image: python:3.11-slim
-          imagePullPolicy: IfNotPresent
+          image: abisoye314/mlflow:v1
+          imagePullPolicy: Always
           env:
             - name: AWS_ACCESS_KEY_ID
-              value: "minio"
+              value: minio
             - name: AWS_SECRET_ACCESS_KEY
-              value: "minio123"
+              value: minio123
             - name: AWS_ENDPOINT_URL
-              value: "http://seaweedfs-s3.kubeflow.svc.cluster.local:8333"
-            - name: POSTGRES_PASSWORD
-              value: "kubeflow2026"  # Update if different
+              value: http://seaweedfs.kubeflow.svc.cluster.local:8333
+            - name: MLFLOW_S3_IGNORE_TLS
+              value: "true"
           command: ["/bin/bash"]
           args:
             - "-c"
-            - |
-              pip install --upgrade pip &&
-              pip install mlflow==3.12.0 boto3 psycopg2-binary &&
-              mlflow server \
-                --host 0.0.0.0 \
-                --port 5000 \
-                --default-artifact-root s3://mlflow-artifacts \
-                --backend-store-uri postgresql+psycopg2://postgres:kubeflow2026@postgres-release-postgresql.postgres.svc.cluster.local:5432/postgres
+            - "mlflow server --host 0.0.0.0 --default-artifact-root s3://mlflow-artifacts --backend-store-uri postgresql+psycopg2://postgres:<POSTGRES_PASSWORD>@postgres-release-postgresql.postgres.svc.cluster.local:5432/postgres"
           ports:
             - containerPort: 5000
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "512Mi"
-              cpu: "500m"
 ```
 
-Apply the deployment:
+> **Note:** Replace `<POSTGRES_PASSWORD>` with the actual password from Phase 1.
 
-```bash
-kubectl apply -f mlflow-deployment.yaml
-
-# Wait for pod to start
-kubectl wait --for=condition=Ready pod -n mlflow -l app=mlflow --timeout=120s
-kubectl get pods -n mlflow
-```
-
-### 2d: Create MLflow Service
-
-Save as `mlflow-service.yaml`:
+### service.yaml
 
 ```yaml
 apiVersion: v1
@@ -205,54 +160,51 @@ spec:
     - protocol: TCP
       port: 5000
       targetPort: 5000
-  type: ClusterIP
 ```
 
-Apply:
+### Deploy
 
 ```bash
-kubectl apply -f mlflow-service.yaml
-kubectl get svc -n mlflow
+kubectl create namespace mlflow
+kubectl apply -f deployment.yaml
+kubectl apply -f service.yaml
+kubectl get pods -n mlflow -w
 ```
 
-### 2e: Access MLflow UI
+### Access
 
 ```bash
-# Port-forward MLflow
-kubectl port-forward -n mlflow svc/mlflow-service 5000:5000 &
-
-# Open browser: http://localhost:5000
-echo "MLflow UI: http://localhost:5000"
+kubectl port-forward svc/mlflow-service -n mlflow 5000:5000
+# http://localhost:5000
 ```
+
+> **Image pull slow?** Pull directly on the node:
+> ```bash
+> sudo ctr images pull docker.io/abisoye314/mlflow:v1
+> ```
 
 ---
 
-## Phase 3: Redis Online Feature Store
+## Phase 3: Redis
 
-Redis serves as the online feature store for Feast. Deploy via Helm.
-
-### 3a: Add Helm repo and create namespace
+### Install
 
 ```bash
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update bitnami
-
 kubectl create namespace redis
-```
 
-### 3b: Install Redis
-
-```bash
 helm install redis-deployment bitnami/redis \
-  --namespace redis \
-  --wait
+  --namespace redis
 
-# Verify
-kubectl get deployment -n redis
-kubectl get pods -n redis  # Should show redis-deployment-master-0 Running
+kubectl get pods -n redis -w
 ```
 
-### 3c: Retrieve Redis Password
+> If you get `release name check failed: cannot reuse a name that is still in use`:
+> ```bash
+> helm uninstall redis-deployment -n redis
+> # Then re-run the install
+> ```
+
+### Get Password
 
 ```bash
 export REDIS_PASSWORD=$(
@@ -262,143 +214,106 @@ export REDIS_PASSWORD=$(
     -o jsonpath="{.data.redis-password}" \
   | base64 -d
 )
-
-echo "Redis Password: $REDIS_PASSWORD"
+echo "Redis password: $REDIS_PASSWORD"
 ```
 
-**Redis connection details:**
+> **Note:** The secret is named `redis-deployment` (not `redis-deployment-redis` as bitnami docs suggest for some versions).
+
+**Connection details:**
 ```
 Host: redis-deployment-master.redis.svc.cluster.local
 Port: 6379
 Password: $REDIS_PASSWORD
 ```
 
-Use these in `feature_store.yaml` online store configuration for Feast.
-
 ---
 
-## Phase 4: BentoML/Yatai Model Serving
+## Phase 4: Yatai
 
-Yatai is the deployment and operations platform for BentoML services on K8s.
+The book's install command no longer works. The current `bentoml/yatai` chart has no bundled postgres or redis — you must point it at external services explicitly.
 
-### 4a: Add Helm repo and create namespace
+### Create yatai bucket in SeaweedFS
+
+```bash
+echo "s3.bucket.create -name yatai" | \
+  kubectl exec -i -n kubeflow deployment/seaweedfs -c seaweedfs -- \
+  /usr/bin/weed shell -master=localhost:9333
+```
+
+### Create yatai database in PostgreSQL
+
+```bash
+kubectl exec -it -n postgres statefulset/postgres-release-postgresql -- \
+  psql -U postgres -W -c "CREATE DATABASE yatai;"
+# Enter $POSTGRES_PASSWORD when prompted
+```
+
+### Install
 
 ```bash
 helm repo add bentoml https://bentoml.github.io/helm-charts
 helm repo update bentoml
 
 kubectl create namespace yatai-system
-```
 
-### 4b: Install Yatai
-
-```bash
-helm install yatai bentoml/yatai \
-  --namespace yatai-system \
+helm install yatai-test bentoml/yatai \
   --set ingress.enabled=false \
-  --set service.type=LoadBalancer \
-  --create-namespace \
-  --wait
+  --set service.type=ClusterIP \
+  --set postgresql.host=postgres-release-postgresql.postgres.svc.cluster.local \
+  --set postgresql.port=5432 \
+  --set postgresql.user=postgres \
+  --set postgresql.password=<POSTGRES_PASSWORD> \
+  --set postgresql.database=yatai \
+  --set s3.endpoint=seaweedfs.kubeflow.svc.cluster.local:8333 \
+  --set s3.bucketName=yatai \
+  --set s3.accessKey=minio \
+  --set s3.secretKey=minio123 \
+  --set s3.secure=false \
+  -n yatai-system
 
-# Verify
-kubectl get pods -n yatai-system
+kubectl get pods -n yatai-system -w
 ```
 
-### 4c: Get Yatai Initialization Token
+> If you get `release name check failed`:
+> ```bash
+> helm uninstall yatai-test -n yatai-system
+> # Then re-run the install
+> ```
 
-On first install, you need to create an admin account:
+### Get Initialization Token and Access
 
 ```bash
-# Get initialization token
+# Secret is named <release-name>-env, not yatai-env
 export YATAI_INITIALIZATION_TOKEN=$(
-  kubectl get secret yatai-env \
+  kubectl get secret yatai-test-env \
     --namespace yatai-system \
     -o jsonpath="{.data.YATAI_INITIALIZATION_TOKEN}" \
   | base64 --decode
 )
 
-# Get Yatai service IP/hostname
-export SERVICE_IP=$(
-  kubectl get svc \
-    --namespace yatai-system \
-    yatai \
-    --template "{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"
-)
+kubectl port-forward svc/yatai-test -n yatai-system 8081:80 &
 
-# If LoadBalancer not available, use port-forward instead:
-kubectl port-forward -n yatai-system svc/yatai 5000:80 &
-SERVICE_IP="localhost:5000"
-
-echo "Create admin account at:"
-echo "http://$SERVICE_IP/setup?token=$YATAI_INITIALIZATION_TOKEN"
+echo "http://localhost:8081/setup?token=$YATAI_INITIALIZATION_TOKEN"
 ```
 
-### 4d: Create Admin Account
-
-1. Open the URL from above in your browser
-2. Enter Name, Email, Password
-3. Create admin account
-
-After login, you can deploy BentoML services to K8s via Yatai.
+Open the URL and create your admin account.
 
 ---
 
-## Phase 5: Evidently UI Data Drift Monitoring
+## Phase 5: Evidently UI
 
-Evidently provides data drift detection and visualization. Set up custom Docker image.
+### deployment.yaml
 
-### 5a: Create Evidently Docker Image
-
-Create `Dockerfile.evidently`:
-
-```dockerfile
-FROM python:3.11-slim-bullseye
-WORKDIR /app
-RUN apt-get update && \
-    apt-get install --no-install-recommends -y \
-    build-essential \
-    && apt-get clean && rm -rf /tmp/* /var/tmp/*
-
-RUN pip install --upgrade pip && \
-    pip install evidently==0.4.30
-
-ENV PYTHONPATH "/app"
-EXPOSE 8000
-
-ENTRYPOINT ["evidently", "ui"]
-```
-
-Build and push to Docker Hub (or local registry):
-
-```bash
-# Build
-docker build -f Dockerfile.evidently -t your-docker-hub/evidently-ui:latest .
-
-# Push (optional, can use local image if testing)
-docker push your-docker-hub/evidently-ui:latest
-```
-
-### 5b: Create Evidently Namespace and Deployment
-
-Save as `evidently-namespace.yaml`:
-
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: evidently
-```
-
-Save as `evidently-deployment.yaml`:
+The `--workspace` flag is required in 0.7.x — the UI will 500 on every request without it.
 
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: evidently-ui
-  namespace: evidently
   labels:
     app: evidently-ui
+  name: evidently-ui
+  namespace: evidently
 spec:
   replicas: 1
   selector:
@@ -410,215 +325,87 @@ spec:
         app: evidently-ui
     spec:
       containers:
-        - name: evidently-ui
-          image: your-docker-hub/evidently-ui:latest  # Change to your image
-          imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 8000
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "512Mi"
-              cpu: "500m"
-          volumeMounts:
-            - name: evidently-data
-              mountPath: /app/data
-      volumes:
-        - name: evidently-data
-          emptyDir: {}
+      - image: abisoye314/evidently-ui:latest
+        name: evidently-ui
+        command: ["evidently", "ui", "--host", "0.0.0.0", "--workspace", "/tmp/workspace"]
+        ports:
+        - containerPort: 8000
 ```
 
-Apply:
+### namespace.yaml
 
-```bash
-kubectl apply -f evidently-namespace.yaml
-kubectl apply -f evidently-deployment.yaml
-
-# Wait for pod
-kubectl wait --for=condition=Ready pod -n evidently -l app=evidently-ui --timeout=60s
-kubectl get pods -n evidently
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: evidently
 ```
 
-### 5c: Create Evidently Service
-
-Save as `evidently-service.yaml`:
+### service.yaml
 
 ```yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: evidently-ui
-  namespace: evidently
   labels:
     app: evidently-ui
+  name: evidently-ui
+  namespace: evidently
 spec:
   ports:
-    - name: "8000"
-      port: 8000
-      protocol: TCP
-      targetPort: 8000
+  - name: 8000-8000
+    port: 8000
+    protocol: TCP
+    targetPort: 8000
   selector:
     app: evidently-ui
   type: ClusterIP
 ```
 
-Apply:
+### Deploy
 
 ```bash
-kubectl apply -f evidently-service.yaml
-kubectl get svc -n evidently
+kubectl apply -f namespace.yaml
+kubectl apply -f deployment.yaml
+kubectl apply -f service.yaml
+kubectl get pods -n evidently -w
 ```
 
-### 5d: Access Evidently UI
+### Access
 
 ```bash
-# Port-forward Evidently
-kubectl port-forward -n evidently svc/evidently-ui 8000:8000 &
-
-# Open browser: http://localhost:8000
-echo "Evidently UI: http://localhost:8000"
-```
-
----
-
-## Verification Checklist
-
-Run after all components are deployed:
-
-```bash
-#!/bin/bash
-echo "=== Post-Install Verification ==="
-
-# Check namespaces
-echo ""
-echo "✓ Namespaces created:"
-kubectl get ns | grep -E "postgres|mlflow|redis|yatai-system|evidently"
-
-# Check all pods running
-echo ""
-echo "✓ Pod status:"
-kubectl get pods -n postgres
-kubectl get pods -n mlflow
-kubectl get pods -n redis
-kubectl get pods -n yatai-system
-kubectl get pods -n evidently
-
-# Check services
-echo ""
-echo "✓ Services:"
-kubectl get svc -n mlflow
-kubectl get svc -n redis
-kubectl get svc -n yatai-system
-kubectl get svc -n evidently
-
-# Test MLflow connectivity
-echo ""
-echo "✓ MLflow API test:"
-kubectl port-forward -n mlflow svc/mlflow-service 5000:5000 >/dev/null 2>&1 &
-sleep 2
-curl -s http://localhost:5000/api/2.0/experiments/list | jq . && echo "✓ MLflow responsive" || echo "✗ MLflow not responding"
-kill %1 2>/dev/null
-
-echo ""
-echo "=== All components deployed ==="
+kubectl port-forward svc/evidently-ui -n evidently 8000:8000
+# http://localhost:8000
 ```
 
 ---
 
-## Access URLs
-
-After deployment, access components via port-forward:
+## Access URLs Summary
 
 ```bash
-# MLflow (experiment tracking + model registry)
-kubectl port-forward -n mlflow svc/mlflow-service 5000:5000 &
+# MLflow
+kubectl port-forward svc/mlflow-service -n mlflow 5000:5000
 # http://localhost:5000
 
-# Yatai (model serving deployment)
-kubectl port-forward -n yatai-system svc/yatai 8080:80 &
-# http://localhost:8080
+# Yatai
+kubectl port-forward svc/yatai-test -n yatai-system 8081:80
+# http://localhost:8081
 
-# Evidently (data drift monitoring)
-kubectl port-forward -n evidently svc/evidently-ui 8000:8000 &
+# Evidently
+kubectl port-forward svc/evidently-ui -n evidently 8000:8000
 # http://localhost:8000
-
-# Kubeflow (ML platform - from bootstrap)
-kubectl port-forward -n kubeflow svc/centraldashboard 8888:80 &
-# http://localhost:8888
-
-# KFP (pipeline UI - from bootstrap)
-kubectl port-forward -n kubeflow svc/ml-pipeline 3000:8888 &
-# http://localhost:3000
 ```
-
----
-
-## Configuration Reference
-
-**Versions:**
-- MLflow: 3.12.0
-- Redis: Latest (Helm bitnami chart)
-- BentoML/Yatai: Latest (Helm chart)
-- Evidently: 0.4.30
-- Helm: 4+
-
-**Storage:**
-- Postgres Backend: `postgres-release-postgresql.postgres.svc.cluster.local:5432`
-- MLflow Artifacts: SeaweedFS S3 gateway at `seaweedfs-s3.kubeflow.svc.cluster.local:8333`
-- Bucket: `mlpipeline` (created during Kubeflow bootstrap), `mlflow-artifacts` (created in Phase 2)
-
-**Credentials:**
-- Postgres User: postgres, Password: kubeflow2026 (set in Phase 1)
-- SeaweedFS S3: Access Key: minio, Secret: minio123 (from Kubeflow deployment)
-- Redis: Generated by Helm (retrieved in Phase 3)
 
 ---
 
 ## Troubleshooting
 
-| Issue | Symptom | Fix |
-|-------|---------|-----|
-| **MLflow pod CrashLoopBackOff** | Logs show connection refused to Postgres | Verify Postgres is Running (`kubectl get pods -n postgres`), check password in deployment env vars |
-| **MLflow can't write to S3** | 403 Forbidden when uploading artifacts | Verify mlflow-artifacts bucket exists, check S3 credentials (minio/minio123) |
-| **Yatai initialization fails** | Token not found in secret | Wait longer for Yatai pods to stabilize (up to 2 minutes), then retry token retrieval |
-| **Redis connection timeout** | Feast can't connect to Redis | Verify Redis pod Running, check hostname: `redis-deployment-master.redis.svc.cluster.local` |
-| **Evidently UI blank** | Port-forward works but page empty | Check pod logs: `kubectl logs -n evidently -l app=evidently-ui` |
-| **SeaweedFS bucket not accessible** | MLflow can't create objects | Verify bucket name is `mlflow-artifacts` (not `mlpipeline`), check S3 endpoint URL |
-
----
-
-## Cleanup (Optional)
-
-```bash
-# Remove all post-install components
-kubectl delete namespace postgres mlflow redis yatai-system evidently
-
-# Or selectively:
-kubectl delete -f mlflow-deployment.yaml -f mlflow-service.yaml -n mlflow
-helm uninstall postgres-release -n postgres
-helm uninstall redis-deployment -n redis
-helm uninstall yatai -n yatai-system
-```
-
----
-
-## Next Steps
-
-After all components are running:
-
-1. **Configure MLflow Tracking** in your ML pipelines:
-   ```python
-   import mlflow
-   mlflow.set_tracking_uri("http://localhost:5000")
-   mlflow.set_experiment("my-experiment")
-   ```
-
-2. **Set up Feast** with Redis as online store (see book Chapter 9)
-
-3. **Build BentoML services** and deploy via Yatai
-
-4. **Configure Evidently** for production data drift monitoring (see book Chapter 10)
-
-5. **Integrate with Kubeflow Pipelines** for end-to-end MLOps workflows
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Yatai: `dial tcp [::1]:5432 connection refused` | Chart not receiving postgres config | Use explicit `--set postgresql.*` flags as shown above |
+| Yatai: `database "yatai" does not exist` | DB not created before install | `CREATE DATABASE yatai` in postgres first |
+| Evidently UI: `500 Internal Server Error` on `/api/projects` | Missing `--workspace` flag or inotify limit | Add `--workspace /tmp/workspace` to command; increase inotify limits |
+| Evidently UI: `inotify instance limit reached` | Single-node k3s exhausts kernel inotify | Run Phase 0 kernel tuning commands |
+| Any pod: `ImagePullBackOff` with TLS timeout | Slow Docker Hub connection | `sudo ctr images pull docker.io/<image>:<tag>` directly on node |
+| Helm: `cannot reuse a name that is still in use` | Previous failed install | `helm uninstall <name> -n <namespace>` then reinstall |
+| Redis secret not found at `redis-deployment-redis` | Secret naming varies by chart version | Check actual name: `kubectl get secrets -n redis` |
