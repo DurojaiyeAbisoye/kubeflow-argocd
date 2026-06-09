@@ -22,7 +22,7 @@ Minimal KFP v2 pipeline that verifies the full Kubeflow platform stack end-to-en
 
 3. **Port-forward to KFP API:**
    ```bash
-   kubectl port-forward -n kubeflow svc/ml-pipeline 3000:8888 &
+   kubectl port-forward -n istio-system svc/istio-ingressgateway 8080:80 &
    ```
 
 ### Usage
