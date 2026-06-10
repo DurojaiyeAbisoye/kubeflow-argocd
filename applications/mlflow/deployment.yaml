@@ -14,6 +14,8 @@ spec:
     metadata:
       labels:
         app: mlflow
+      annotations:
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
         - name: mlflow
@@ -34,8 +36,5 @@ spec:
           args:
             - "-c"
             - "mlflow server --host 0.0.0.0 --default-artifact-root s3://mlflow-artifacts --backend-store-uri postgresql+psycopg2://postgres:UaDYIgKmrfupZrfTuCcNFPzn@postgres-release-postgresql.postgres.svc.cluster.local:5432/postgres"
-          # args:
-          #   - "-c"
-          #   - "mlflow server --host 0.0.0.0 --default-artifact-root s3://mlflow-artifacts --backend-store-uri postgresql+psycopg2://postgres:UaDYIgKmrfupZrfTuCcNFPzn@postgres-release-postgresql.postgres.svc.cluster.local:5432/postgres --static-prefix=/mlflow"
           ports:
             - containerPort: 5000
