@@ -11,9 +11,7 @@ spec:
   http:
   - match:
     - uri:
-        prefix: /mlflow/
-    rewrite:
-      uri: /
+        prefix: /mlflow
     route:
     - destination:
         host: mlflow-service.mlflow.svc.cluster.local
