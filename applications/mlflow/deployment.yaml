@@ -26,6 +26,8 @@ spec:
               value: minio123
             - name: AWS_ENDPOINT_URL
               value: http://seaweedfs.kubeflow.svc.cluster.local:8333
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: "http://seaweedfs.kubeflow.svc.cluster.local:8333"
             - name: MLFLOW_S3_IGNORE_TLS
               value: "true"
           command: ["/bin/bash"]
