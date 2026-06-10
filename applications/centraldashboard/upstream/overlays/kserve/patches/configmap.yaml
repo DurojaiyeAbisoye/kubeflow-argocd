@@ -38,6 +38,12 @@ data:
                 "icon": "kubeflow:models"
             },
             {
+                "type": "item",
+                "link": "/mlflow/",
+                "text": "MLflow",
+                "icon": "icons:cached"
+            },
+            {
                 "icon": "kubeflow:pipeline-centered",
                 "items": [
                     {
