@@ -12,13 +12,27 @@ patches:
       kind: ConfigMap
       name: argocd-cm
       namespace: argocd
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+    target:
+      kind: Deployment
+      namespace: argocd
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+    target:
+      kind: StatefulSet
+      namespace: argocd
 
 images:
   - name: quay.io/argoproj/argocd
     newTag: v3.3.9
   - name: ghcr.io/dexidp/dex
     newTag: v2.45.1
-  - name: redis
-    newTag: 8.8.0-alpine
+  - name: public.ecr.aws/docker/library/redis
+    newTag: 8.2.3-alpine
   - name: haproxy
     newTag: 3.3.6-alpine
