@@ -29,4 +29,3 @@ resources:
   - argocd-apps/volumes-web-app.yaml
   - argocd-apps/tensorboards-web-app.yaml   
   - argocd-apps/models-web-app.yaml
-  - argocd-apps/mlflow.yaml
