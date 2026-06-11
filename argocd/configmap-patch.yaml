@@ -6,7 +6,8 @@ metadata:
 data:
   kustomize.buildOptions: "--enable-helm"
   kustomize.path.v5.8.1: /usr/local/bin/kustomize
-  server.repo.server.timeout.seconds: "300"
+  server.repo.server.timeout.seconds: "30000"
+  reposerver.exec.timeout: "300s"
   resource.compareoptions: |
     ignoreAggregatedRoles: true
   resource.customizations: |
