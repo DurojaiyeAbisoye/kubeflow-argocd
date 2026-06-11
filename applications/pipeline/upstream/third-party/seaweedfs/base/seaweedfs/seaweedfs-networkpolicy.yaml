@@ -24,6 +24,15 @@ spec:
     - podSelector: {}
     ports:
     - port: 8333
+  - from:
+    - namespaceSelector:
+        matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values:
+          - mlflow
+    ports:
+    - port: 8333
   podSelector:
     matchExpressions:
     - key: app
