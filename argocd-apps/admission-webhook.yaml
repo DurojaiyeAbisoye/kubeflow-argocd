@@ -22,7 +22,7 @@ spec:
     kind: ValidatingWebhookConfiguration
     jsonPointers:
       - /webhooks/0/clientConfig/caBundle
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+  - group: admissionregistration.k8s.io
+    kind: MutatingWebhookConfiguration
+    jsonPointers:
+      - /webhooks/0/clientConfig/caBundle
