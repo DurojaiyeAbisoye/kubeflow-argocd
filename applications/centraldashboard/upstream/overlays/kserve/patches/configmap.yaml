@@ -36,7 +36,13 @@ data:
                 "link": "/kserve-endpoints/",
                 "text": "KServe Endpoints",
                 "icon": "kubeflow:models"
-            },
+            }
+                        {
+                "icon": "cached",
+                "link": "/mlflow/",
+                "text": "MLflow",
+                "type": "item"
+            },,
             {
                 "icon": "kubeflow:pipeline-centered",
                 "items": [

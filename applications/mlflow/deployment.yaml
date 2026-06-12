@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-deployment
+  namespace: mlflow
+  labels:
+    app: mlflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      containers:
+        - name: mlflow
+          image: abisoye314/mlflow:v1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              value: minio
+            - name: AWS_SECRET_ACCESS_KEY
+              value: minio123
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: "http://seaweedfs.kubeflow.svc.cluster.local:8333"
+            - name: MLFLOW_S3_IGNORE_TLS
+              value: "true"
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+          command: ["/bin/bash"]
+          args:
+            - "-c"
+            - "mlflow server --host 0.0.0.0 --serve-artifacts --artifacts-destination s3://mlflow-artifacts --backend-store-uri postgresql+psycopg2://postgres:UaDYIgKmrfupZrfTuCcNFPzn@postgres-release-postgresql.postgres.svc.cluster.local:5432/postgres"
+          ports:
+            - containerPort: 5000
