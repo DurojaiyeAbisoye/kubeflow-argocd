@@ -33,6 +33,6 @@ spec:
           command: ["/bin/bash"]
           args:
             - "-c"
-            - "mlflow server --host 0.0.0.0 --allowed-hosts 'mlflow-service.mlflow.svc.cluster.local:5000,mlflow-service.mlflow:5000,mlflow-service:5000,localhost:*,127.0.0.1:*' --serve-artifacts --artifacts-destination s3://mlflow-artifacts --backend-store-uri postgresql+psycopg2://postgres:UaDYIgKmrfupZrfTuCcNFPzn@postgres-release-postgresql.postgres.svc.cluster.local:5432/postgres"
+            - "mlflow server --host 0.0.0.0 --allowed-hosts 'mlflow-service.mlflow.svc.cluster.local:5000,mlflow-service.mlflow:5000,mlflow-service:5000,host.docker.internal:5000,localhost:*,127.0.0.1:*' --serve-artifacts --artifacts-destination s3://mlflow-artifacts --backend-store-uri postgresql+psycopg2://postgres:UaDYIgKmrfupZrfTuCcNFPzn@postgres-release-postgresql.postgres.svc.cluster.local:5432/postgres"
           ports:
             - containerPort: 5000
