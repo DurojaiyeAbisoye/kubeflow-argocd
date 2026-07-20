@@ -98,7 +98,7 @@ patches:
         {
           "defaultDeploymentMode": "Standard"
         }
-      # deployDefaults: |-
-      #   {
-      #     "deployRaw": true
-      #   }
+  # deployDefaults: |-
+  #   {
+  #     "deployRaw": true
+  #   }
